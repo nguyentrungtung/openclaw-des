@@ -19,6 +19,7 @@
 | [08-security.md](08-security.md) | Security hardening, audit, backup, update |
 | [09b-9router.md](09b-9router.md) | **9Router** — fallback tự động: Paid API → NVIDIA Free → Ollama Local |
 | [10-workspace-templates.md](10-workspace-templates.md) | SOUL.md, AGENTS.md, USER.md, MEMORY.md, HEARTBEAT.md templates thực tế |
+| [11-suggested-skills.md](11-suggested-skills.md) | **26 skills cộng đồng hay dùng nhất** — phân loại theo use case, CLI install |
 | [QUICKSTART.md](QUICKSTART.md) | Từ zero đến chạy được trong 15 phút |
 
 ---
