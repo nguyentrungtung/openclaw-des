@@ -26,6 +26,8 @@ OpenClaw
 ## Bước 1: Cài 9Router
 
 ```bash
+# Cài vào Node.js hệ thống (global) — KHÔNG dùng npm của openclaw
+# 9Router là server độc lập, openclaw kết nối qua HTTP, không import module
 npm install -g 9router
 9router
 # Dashboard tự mở tại http://localhost:20128
@@ -225,14 +227,19 @@ Dashboard → Settings (icon góc trên phải) → API Key → Copy
 
 ### Config openclaw.json
 
+> **Không xoá provider cũ** — nếu đang có sẵn provider khác (NVIDIA, Gemini...), giữ nguyên và chỉ **thêm `ninerouter` vào cạnh**. Provider cũ vẫn dùng được để debug hoặc bypass 9Router khi cần. 9Router tự quản lý các API key của từng provider trong dashboard của nó — không liên quan đến provider trong `openclaw.json`.
+
+Chỉ thêm/sửa hai phần sau vào file hiện có:
+
 ```json
 {
   "models": {
     "mode": "merge",
     "providers": {
+      "provider-cu": { "...giữ nguyên..." },
       "ninerouter": {
         "baseUrl": "http://127.0.0.1:20128/v1",
-        "apiKey": "YOUR_9ROUTER_DASHBOARD_KEY",
+        "apiKey": "KEY_LẤY_TỪ_9ROUTER_DASHBOARD",
         "models": [
           "stable-stack",
           "zero-cost",
@@ -257,19 +264,17 @@ Dashboard → Settings (icon góc trên phải) → API Key → Copy
 
 ### CLI commands
 
+> ⚠️ **Không dùng `config set` từng dòng khi thêm provider mới** — openclaw validate toàn bộ object mỗi lần set, sẽ báo lỗi `models: expected array, received undefined` nếu chưa đủ fields. Dùng `openclaw config edit` để thêm cả block một lúc.
+
 ```bash
-# Thêm 9Router như provider
-openclaw config set models.providers.ninerouter.baseUrl "http://127.0.0.1:20128/v1"
-openclaw config set models.providers.ninerouter.apiKey "YOUR_9ROUTER_KEY"
-openclaw config set models.providers.ninerouter.models '["stable-stack","zero-cost","code-stack"]'
+# Mở editor để thêm toàn bộ block ninerouter một lúc
+openclaw config edit
 
-# Set làm primary model
-openclaw config set agents.defaults.model.primary "ninerouter/stable-stack"
+# Sau khi lưu file, restart gateway
+openclaw gateway restart
 
-# Dùng zero-cost cho heartbeat (không cần model mạnh)
-openclaw config set agents.defaults.heartbeat.model "ninerouter/zero-cost"
-
-# Restart
+# config set chỉ dùng được khi provider đã tồn tại đầy đủ rồi, ví dụ đổi key:
+openclaw config set models.providers.ninerouter.apiKey "NEW_KEY"
 openclaw gateway restart
 ```
 

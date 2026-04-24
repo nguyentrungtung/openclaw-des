@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:docs.openclaw.ai)"
+      "WebFetch(domain:docs.openclaw.ai)",
+      "Bash(~/.openclaw/bin/openclaw skills *)",
+      "Bash(node -e \" const fs = require\\('fs'\\); const src = fs.readFileSync\\('/Users/tungnt/.openclaw/lib/node_modules/openclaw/dist/config-DUIgvEzx.js', 'utf8'\\); // Find all config keys parsed from browser profile config const matches = src.match\\(/cfg\\\\?\\\\.[a-zA-Z]+/g\\) || []; console.log\\([...new Set\\(matches\\)].sort\\(\\).join\\('\\\\n'\\)\\); \")",
+      "Bash(node -e \" const fs = require\\('fs'\\); const src = fs.readFileSync\\('/Users/tungnt/.openclaw/lib/node_modules/openclaw/dist/config-DUIgvEzx.js', 'utf8'\\); // Find profile-level config keys const matches = src.match\\(/profile\\\\?\\\\.[a-zA-Z]+|profileCfg\\\\?\\\\.[a-zA-Z]+|p\\\\?\\\\.[a-zA-Z]+/g\\) || []; const unique = [...new Set\\(matches\\)].sort\\(\\); console.log\\(unique.join\\('\\\\n'\\)\\); \")",
+      "Bash(node -e ' *)",
+      "Bash(mkdir -p /tmp/openclaw)",
+      "Bash(~/.openclaw/bin/openclaw browser *)",
+      "Bash(~/.openclaw/bin/openclaw channels *)"
     ]
   }
 }
