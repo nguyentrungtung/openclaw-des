@@ -222,8 +222,12 @@ Khi nào 9Router chuyển tier:
 ### Lấy API key từ 9Router
 
 ```
-Dashboard → Settings (icon góc trên phải) → API Key → Copy
+Dashboard → Settings (icon góc trên phải) → Security → API Key
 ```
+
+Key mặc định là `sk_9router`. Có thể dùng luôn key này — không cần tạo mới trừ khi muốn rotate.
+
+> **Bỏ qua mục MITM** trong sidebar — đó là tính năng chặn traffic cho Antigravity IDE / GitHub Copilot / Kiro (các tool không cho phép đổi endpoint). OpenClaw kết nối thẳng qua `baseUrl`, không cần MITM, không cần Trust Cert, không cần Start Server.
 
 ### Config openclaw.json
 
@@ -278,16 +282,56 @@ openclaw config set models.providers.ninerouter.apiKey "NEW_KEY"
 openclaw gateway restart
 ```
 
-### Kiểm tra kết nối
+### Kiểm tra kết nối và xác nhận request đi qua 9Router
+
+**Bước 1 — Ping 9Router**
 
 ```bash
-# Test 9Router trực tiếp
-curl http://127.0.0.1:20128/v1/models \
-  -H "Authorization: Bearer YOUR_9ROUTER_KEY"
-
-# Test qua OpenClaw
-openclaw agent --to "test" --message "Mô hình nào đang trả lời câu này?" --local
+curl http://127.0.0.1:20128/health
+# Kết quả: {"status":"ok"} hoặc {"status":"running"}
 ```
+
+**Bước 2 — Xem danh sách model 9Router thấy**
+
+```bash
+curl http://127.0.0.1:20128/v1/models \
+  -H "Authorization: Bearer sk_9router"
+# Kết quả: danh sách combo (stable-stack, zero-cost, code-stack)
+# Nếu không thấy combo → vào Dashboard/Combos tạo trước
+```
+
+**Bước 3 — Gửi request thử qua 9Router**
+
+```bash
+curl http://127.0.0.1:20128/v1/chat/completions \
+  -H "Authorization: Bearer sk_9router" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "stable-stack",
+    "messages": [{"role": "user", "content": "Say: 9router OK"}],
+    "max_tokens": 20
+  }'
+# Kết quả: response JSON từ model — header x-model-used cho biết model thật
+```
+
+**Bước 4 — Xác nhận OpenClaw đang routing qua 9Router**
+
+```bash
+# Gửi message qua OpenClaw
+openclaw agent --to "test" --message "Bạn là model nào?" --local
+
+# Hoặc xem log gateway để thấy request gửi đến 127.0.0.1:20128
+openclaw gateway logs --tail 50
+```
+
+**Bước 5 — Xem request log trên Dashboard**
+
+Vào `http://localhost:20128` → **Usage** → thấy từng request với:
+- Model thật được chọn (ví dụ: `gemini-2.5-pro`)
+- Tier đã dùng (Tier 1 / 2 / 3)
+- Token count và latency
+
+Nếu request xuất hiện ở đây → OpenClaw đã đi qua 9Router thành công.
 
 ---
 

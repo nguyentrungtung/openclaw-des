@@ -22,16 +22,15 @@
     "defaults": {
       "workspace": "~/.openclaw/workspace",
       "model": {
-        "primary": "anthropic/claude-sonnet-4-6",
+        "primary": "ninerouter/stable-stack",
         "fallbacks": [
-          "openai/gpt-4.1",
-          "openrouter/google/gemini-2.5-pro"
+          "ninerouter/zero-cost"
         ]
       },
       "heartbeat": {
         "enabled": true,
         "every": "30m",
-        "model": "openrouter/google/gemini-2.5-flash",
+        "model": "ninerouter/zero-cost",
         "target": "last",
         "lightContext": true,
         "isolatedSession": true,
@@ -52,11 +51,11 @@
     "list": {
       "coder": {
         "workspace": "~/.openclaw/workspaces/coder",
-        "model": { "primary": "anthropic/claude-opus-4-6" }
+        "model": { "primary": "ninerouter/code-stack" }
       },
       "assistant": {
         "workspace": "~/.openclaw/workspaces/assistant",
-        "model": { "primary": "openrouter/google/gemini-2.5-flash" }
+        "model": { "primary": "ninerouter/zero-cost" }
       }
     }
   },
@@ -64,6 +63,15 @@
   "models": {
     "mode": "merge",
     "providers": {
+      "ninerouter": {
+        "baseUrl": "http://127.0.0.1:20128/v1",
+        "apiKey": "{{ NINEROUTER_API_KEY }}",
+        "models": [
+          "stable-stack",
+          "zero-cost",
+          "code-stack"
+        ]
+      },
       "anthropic": {
         "apiKey": "{{ từ .env: ANTHROPIC_API_KEY }}",
         "models": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"]
@@ -158,7 +166,7 @@
 | `tailnet` | Qua Tailscale VPN | Remote access an toàn |
 | `any` | Public network | ⚠️ Chỉ khi có firewall + auth token mạnh |
 
-**`agents.defaults.model.fallbacks`**: Danh sách model thử theo thứ tự khi primary bị lỗi/rate-limit. Không cần ClawRouter để có basic fallback.
+**`agents.defaults.model.fallbacks`**: Danh sách model thử theo thứ tự khi primary bị lỗi/rate-limit. Khi dùng 9Router, fallback thường chỉ cần `ninerouter/zero-cost` vì bản thân 9Router đã tự xử lý fallback giữa các provider bên trong.
 
 **`models.mode`**:
 - `merge` — merge providers của bạn với built-in defaults
@@ -174,7 +182,7 @@ openclaw config get agents.defaults.model.primary
 openclaw config get channels.telegram.allowFrom
 
 # Ghi giá trị đơn
-openclaw config set agents.defaults.model.primary "anthropic/claude-sonnet-4-6"
+openclaw config set agents.defaults.model.primary "ninerouter/stable-stack"
 
 # Ghi giá trị mảng (phải là JSON string hợp lệ)
 openclaw config set channels.telegram.allowFrom '["123456789", "987654321"]'
@@ -196,6 +204,40 @@ openclaw gateway restart
 ---
 
 ## 3.3 Model providers — cách thêm chi tiết
+
+### 9Router (**khuyến nghị — dùng làm primary**)
+
+9Router là proxy chạy local (port 20128) tự động fallback giữa nhiều model. Thêm vào config sau khi đã [cài và cấu hình 9Router](./09b-9router.md):
+
+```bash
+# 1. Lấy API key từ 9Router Dashboard → Settings → API Key
+# 2. Thêm vào .env
+echo 'NINEROUTER_API_KEY=nr-xxxx' >> ~/.openclaw/.env
+
+# 3. Config provider (dùng config edit vì thêm nguyên block)
+openclaw config edit
+```
+
+Block cần thêm vào `models.providers`:
+
+```json
+"ninerouter": {
+  "baseUrl": "http://127.0.0.1:20128/v1",
+  "apiKey": "$NINEROUTER_API_KEY",
+  "models": ["stable-stack", "zero-cost", "code-stack"]
+}
+```
+
+Đổi primary sang 9Router:
+
+```bash
+openclaw config set agents.defaults.model.primary "ninerouter/stable-stack"
+openclaw config set agents.defaults.model.fallbacks '["ninerouter/zero-cost"]'
+openclaw config set agents.defaults.heartbeat.model "ninerouter/zero-cost"
+openclaw gateway restart
+```
+
+> **Lưu ý**: Dùng `127.0.0.1` thay vì `localhost` — OpenClaw có bug IPv6 resolution với `localhost`. Xem chi tiết combo setup tại [Phần 9B](./09b-9router.md).
 
 ### Anthropic Claude
 
@@ -265,26 +307,29 @@ openclaw config set models.providers.litellm.apiKey "sk-local"
 openclaw config set models.providers.litellm.models '["gpt-4","claude-3","gemini-pro"]'
 ```
 
-### ClawRouter (smart router — xem chi tiết Phần 9)
+### 9Router (smart router — xem chi tiết [Phần 9B](./09b-9router.md))
 
 ```bash
-# Sau khi cài ClawRouter
-openclaw config set agents.defaults.model.primary "blockrun/auto"
+# Sau khi cài và cấu hình 9Router, đổi primary về combo
+openclaw config set agents.defaults.model.primary "ninerouter/stable-stack"
+openclaw gateway restart
 ```
 
 ---
 
 ## 3.4 Chiến lược model routing theo task
 
-| Task | Model khuyến nghị | Lý do |
+Khi dùng 9Router, gán combo phù hợp cho từng loại task thay vì chỉ định từng model lẻ:
+
+| Task | Combo khuyến nghị | Lý do |
 |------|-------------------|-------|
-| Heartbeat checks | `ollama/llama3.2` hoặc `gemini-2.5-flash` | Rẻ/miễn phí, đủ cho monitoring |
-| Cron tasks đơn giản (tóm tắt, nhắc nhở) | `deepseek/deepseek-chat` | Cost-effective, text quality tốt |
-| Cron tasks phức tạp (phân tích, research) | `gemini-2.5-pro` | Mạnh, giá hợp lý |
-| Browser automation (form filling, scraping) | `claude-sonnet-4-6` hoặc `gemini-2.5-pro` | Vision + reasoning tốt |
-| Coding (generate, refactor, debug) | `claude-opus-4-6` hoặc `gpt-5.1-codex` | Mạnh nhất cho code |
-| Chat thông thường | `claude-sonnet-4-6` | Cân bằng chất lượng/giá |
-| Toàn bộ tự động | `blockrun/auto` (ClawRouter) | Tự chọn model theo task |
+| Heartbeat checks | `ninerouter/zero-cost` | NVIDIA free → Ollama local, không tốn quota paid |
+| Cron tasks đơn giản (tóm tắt, nhắc nhở) | `ninerouter/zero-cost` | Đủ chất lượng, miễn phí |
+| Cron tasks phức tạp (phân tích, research) | `ninerouter/stable-stack` | Gemini Pro trước, NVIDIA fallback |
+| Browser automation (form filling, scraping) | `ninerouter/stable-stack` | Paid model với vision + reasoning |
+| Coding (generate, refactor, debug) | `ninerouter/code-stack` | Claude → Kimi K2.5 → Qwen local |
+| Chat thông thường | `ninerouter/stable-stack` | Chất lượng cao, tự động fallback |
+| Monitor / agent chạy 24/7 | `ninerouter/zero-cost` | Không quota, không chi phí |
 
 ### Cấu hình model theo loại task trong config
 
@@ -293,19 +338,19 @@ openclaw config set agents.defaults.model.primary "blockrun/auto"
   "agents": {
     "defaults": {
       "model": {
-        "primary": "anthropic/claude-sonnet-4-6",
-        "fallbacks": ["openrouter/google/gemini-2.5-pro"]
+        "primary": "ninerouter/stable-stack",
+        "fallbacks": ["ninerouter/zero-cost"]
       },
       "heartbeat": {
-        "model": "openrouter/google/gemini-2.5-flash"
+        "model": "ninerouter/zero-cost"
       }
     },
     "list": {
       "coder": {
-        "model": { "primary": "anthropic/claude-opus-4-6" }
+        "model": { "primary": "ninerouter/code-stack" }
       },
       "monitor": {
-        "model": { "primary": "ollama/llama3.2:latest" }
+        "model": { "primary": "ninerouter/zero-cost" }
       }
     }
   }
